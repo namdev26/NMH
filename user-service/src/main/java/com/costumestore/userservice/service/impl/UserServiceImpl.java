@@ -50,4 +50,38 @@ public class UserServiceImpl implements UserService {
                 .map(userMapper::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
     }
+
+    @Override
+    public LoginResponse login(LoginRequest request) {
+        log.debug("Authenticating username: {}", request.getUsername());
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sai tên đăng nhập hoặc mật khẩu"));
+
+        if (!user.getPassword().equals(request.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sai tên đăng nhập hoặc mật khẩu");
+        }
+
+        if (!(user instanceof Manager manager)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tài khoản này không có quyền truy cập trang quản lý");
+        }
+
+        String fullName = null;
+        if (manager.getFullName() != null) {
+            String firstName = manager.getFullName().getFirstName();
+            String lastName = manager.getFullName().getLastName();
+            fullName = ((firstName == null ? "" : firstName) + " " + (lastName == null ? "" : lastName)).trim();
+            if (fullName.isBlank()) {
+                fullName = null;
+            }
+        }
+
+        return LoginResponse.builder()
+                .id(manager.getId())
+                .username(manager.getUsername())
+                .userType("MANAGER")
+                .fullName(fullName)
+                .managerCode(manager.getManagerCode())
+                .title(manager.getTitle())
+                .build();
+    }
 }

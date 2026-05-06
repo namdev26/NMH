@@ -1,14 +1,20 @@
 package com.costumestore.userservice.service.impl;
 
+import com.costumestore.userservice.dto.request.LoginRequest;
+import com.costumestore.userservice.dto.response.LoginResponse;
 import com.costumestore.userservice.dto.response.UserResponse;
+import com.costumestore.userservice.entity.Manager;
+import com.costumestore.userservice.entity.User;
 import com.costumestore.userservice.exception.ResourceNotFoundException;
 import com.costumestore.userservice.mapper.UserMapper;
 import com.costumestore.userservice.repository.UserRepository;
 import com.costumestore.userservice.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 

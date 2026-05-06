@@ -22,6 +22,14 @@ public class UserController {
 
     private final UserService userService;
 
+    @PostMapping("/api/auth/login")
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        log.info(">>> REQUEST POST /api/auth/login\n    Body: username={}", request.getUsername());
+        LoginResponse result = userService.login(request);
+        log.info("<<< RESPONSE 200\n    Body: {}", result);
+        return ResponseEntity.ok(result);
+    }
+
     @PostMapping("/api/users/by-ids")
     public ResponseEntity<List<UserResponse>> getUserListByIds(@Valid @RequestBody UserListRequest request) {
         log.info(">>> REQUEST POST /api/users/by-ids\n    Body: {}", request);

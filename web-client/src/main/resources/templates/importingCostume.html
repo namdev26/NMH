@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle}">Nhập Trang Phục</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .costume-card { cursor: pointer; transition: all 0.2s; border: 2px solid transparent; }
+        .costume-card.selected { border-color: #0d6efd; background-color: #e7f1ff; }
+        .costume-card:hover { border-color: #86b7fe; }
+        .navbar-custom { background: linear-gradient(135deg, #667eea, #764ba2); }
+    </style>
+</head>
+<body class="bg-light">
+<nav class="navbar navbar-dark navbar-custom px-4 py-3">
+    <a th:href="@{/}" class="text-white text-decoration-none">
+        <i class="bi bi-arrow-left me-2"></i>Quay lại
+    </a>
+    <span class="navbar-brand mx-auto fw-bold" th:text="${pageTitle}">Nhập Trang Phục</span>
+    <span></span>
+</nav>
+
+<div class="container py-4">
+    <div th:if="${param.error}" class="alert alert-danger alert-dismissible">
+        <i class="bi bi-exclamation-triangle me-2"></i>Có lỗi xảy ra khi nhập hàng. Vui lòng thử lại.
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <form th:action="@{/importing-costume}" method="post" id="importForm">
+        <div class="row g-4">
+            <!-- Left: Costume List -->
+            <div class="col-lg-8">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-bag me-2"></i>Danh Sách Trang Phục</h5>
+                        <span class="badge bg-light text-primary" id="selectedCount">0 đã chọn</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="input-group mb-3">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="text" id="searchCostume" class="form-control"
+                                   placeholder="Tìm kiếm trang phục...">
+                        </div>
+                        <div class="row g-2" id="costumeList">
+                            <div th:each="costume : ${costumes}" class="col-md-6 costume-col"
+                                 th:data-supplier-id="${costume.supplierId}">
+                                <div class="card costume-card p-2"
+                                     th:data-costume-id="${costume.id}"
+                                     th:data-costume-name="${costume.name}"
+                                     th:data-sell-price="${costume.sellPrice}">
+                                    <div class="d-flex align-items-start">
+                                        <input type="checkbox" class="form-check-input me-2 mt-1 costume-check"
+                                               th:value="${costume.id}" name="costumeIds" style="display:none">
+                                        <div class="flex-grow-1">
+                                            <p class="fw-semibold mb-1 small" th:text="${costume.name}">Tên trang phục</p>
+                                            <div class="d-flex flex-wrap gap-1 mb-1">
+                                                <span class="badge bg-secondary small" th:text="${costume.costumeLine?.name}">Dòng</span>
+                                                <span class="badge bg-info text-dark small" th:text="${costume.size}">Size</span>
+                                                <span class="badge bg-warning text-dark small" th:text="${costume.color}">Màu</span>
+                                            </div>
+                                            <p class="text-success fw-bold mb-0 small">
+                                                <span th:text="${costume.sellPrice != null ? #numbers.formatDecimal(costume.sellPrice, 0, 'COMMA', 0, 'POINT') : '0'}">0</span> VND
+                                            </p>
+                                            <div class="import-price-input mt-1" style="display:none">
+                                                <input type="number" class="form-control form-control-sm import-price"
+                                                       placeholder="Giá nhập (VND)" min="0" step="1000">
+                                            </div>
+                                            <div class="import-qty-input mt-1" style="display:none">
+                                                <input type="number" class="form-control form-control-sm import-qty"
+                                                       placeholder="Số lượng" min="1" step="1" value="1">
+                                            </div>
+                                        </div>
+                                        <i class="bi bi-check-circle-fill text-primary ms-1 check-icon" style="display:none; font-size:1.2rem;"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div th:if="${#lists.isEmpty(costumes)}" class="text-center text-muted py-4">
+                            <i class="bi bi-inbox fs-1"></i>
+                            <p>Không có trang phục nào</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Order Summary -->
+            <div class="col-lg-4">
+                <!-- Supplier Select -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="bi bi-truck me-2"></i>Nhà Cung Cấp</h5>
+                    </div>
+                    <div class="card-body">
+                        <select class="form-select" name="supplierId" id="supplierSelect" required>
+                            <option value="">-- Chọn nhà cung cấp --</option>
+                            <option th:each="supplier : ${suppliers}"
+                                    th:value="${supplier.id}"
+                                    th:text="${supplier.name}">Nhà cung cấp</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Manager ID is resolved from server-side session -->
+
+                <!-- Selected Summary -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="bi bi-cart me-2"></i>Đã Chọn</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul class="list-group list-group-flush" id="selectedList">
+                            <li class="list-group-item text-muted text-center small py-3">
+                                <i class="bi bi-cart-x"></i> Chưa chọn trang phục
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg" id="submitBtn" disabled>
+                        <i class="bi bi-check-circle me-2"></i>Xác Nhận Nhập Hàng
+                    </button>
+                    <a th:href="@{/}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x me-2"></i>Huỷ
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hidden inputs for import prices -->
+        <div id="importPriceInputs"></div>
+    </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const selectedCostumes = new Map();
+
+    document.querySelectorAll('.costume-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const costumeId = this.dataset.costumeId;
+            const costumeName = this.dataset.costumeName;
+            const priceInput = this.querySelector('.import-price');
+            const qtyInput = this.querySelector('.import-qty');
+            const checkIcon = this.querySelector('.check-icon');
+            const priceContainer = this.querySelector('.import-price-input');
+            const qtyContainer = this.querySelector('.import-qty-input');
+
+            if (selectedCostumes.has(costumeId)) {
+                selectedCostumes.delete(costumeId);
+                this.classList.remove('selected');
+                checkIcon.style.display = 'none';
+                priceContainer.style.display = 'none';
+                qtyContainer.style.display = 'none';
+                priceInput.value = '';
+                qtyInput.value = '1';
+            } else {
+                selectedCostumes.set(costumeId, { name: costumeName, price: 0, quantity: 1 });
+                this.classList.add('selected');
+                checkIcon.style.display = 'inline';
+                priceContainer.style.display = 'block';
+                qtyContainer.style.display = 'block';
+                priceInput.focus();
+            }
+
+            updateSummary();
+        });
+    });
+
+    document.querySelectorAll('.import-price').forEach(input => {
+        input.addEventListener('click', e => e.stopPropagation());
+        input.addEventListener('input', function() {
+            const card = this.closest('.costume-card');
+            const costumeId = card.dataset.costumeId;
+            if (selectedCostumes.has(costumeId)) {
+                selectedCostumes.get(costumeId).price = parseFloat(this.value) || 0;
+            }
+            updateSummary();
+        });
+    });
+
+    document.querySelectorAll('.import-qty').forEach(input => {
+        input.addEventListener('click', e => e.stopPropagation());
+        input.addEventListener('input', function() {
+            const card = this.closest('.costume-card');
+            const costumeId = card.dataset.costumeId;
+            if (selectedCostumes.has(costumeId)) {
+                const qty = parseInt(this.value, 10) || 0;
+                selectedCostumes.get(costumeId).quantity = qty > 0 ? qty : 0;
+            }
+            updateSummary();
+        });
+    });
+
+    function updateSummary() {
+        const list = document.getElementById('selectedList');
+        const countBadge = document.getElementById('selectedCount');
+        const submitBtn = document.getElementById('submitBtn');
+
+        countBadge.textContent = selectedCostumes.size + ' đã chọn';
+
+        if (selectedCostumes.size === 0) {
+            list.innerHTML = '<li class="list-group-item text-muted text-center small py-3"><i class="bi bi-cart-x"></i> Chưa chọn trang phục</li>';
+            submitBtn.disabled = true;
+            return;
+        }
+
+        let html = '';
+        selectedCostumes.forEach((data, id) => {
+            html += `<li class="list-group-item small py-2">
+                <div class="fw-semibold">${data.name}</div>
+                <div class="text-success">Giá nhập: ${data.price > 0 ? data.price.toLocaleString() + ' VND' : '<span class="text-danger">Chưa nhập</span>'}</div>
+                <div class="text-primary">Số lượng: ${data.quantity > 0 ? data.quantity : '<span class="text-danger">Chưa nhập</span>'}</div>
+            </li>`;
+        });
+        list.innerHTML = html;
+
+        const allFieldsSet = Array.from(selectedCostumes.values()).every(d => d.price > 0 && d.quantity > 0);
+        submitBtn.disabled = !allFieldsSet;
+
+        updateHiddenInputs();
+    }
+
+    function updateHiddenInputs() {
+        const container = document.getElementById('importPriceInputs');
+        let html = '';
+        selectedCostumes.forEach((data, id) => {
+            html += `<input type="hidden" name="importPrices" value="${data.price}">`;
+            html += `<input type="hidden" name="quantities" value="${data.quantity}">`;
+        });
+        container.innerHTML = html;
+
+        document.querySelectorAll('input[name="costumeIds"]').forEach(cb => cb.checked = false);
+        selectedCostumes.forEach((data, id) => {
+            const cb = document.querySelector(`.costume-card[data-costume-id="${id}"] .costume-check`);
+            if (cb) cb.checked = true;
+        });
+    }
+
+    document.getElementById('searchCostume').addEventListener('input', function() {
+        const query = this.value.toLowerCase();
+        const selectedSupplierId = document.getElementById('supplierSelect').value;
+        document.querySelectorAll('.costume-col').forEach(col => {
+            const card = col.querySelector('.costume-card');
+            const name = card.dataset.costumeName.toLowerCase();
+            const colSupplierId = col.dataset.supplierId || '';
+            const matchSearch = name.includes(query);
+            const matchSupplier = !selectedSupplierId || !colSupplierId || colSupplierId === selectedSupplierId;
+            col.style.display = (matchSearch && matchSupplier) ? 'block' : 'none';
+        });
+    });
+
+    document.getElementById('supplierSelect').addEventListener('change', function() {
+        const selectedSupplierId = this.value;
+        const searchQuery = document.getElementById('searchCostume').value.toLowerCase();
+
+        // Deselect costumes that are being hidden
+        document.querySelectorAll('.costume-col').forEach(col => {
+            const card = col.querySelector('.costume-card');
+            const colSupplierId = col.dataset.supplierId || '';
+            const matchSearch = card.dataset.costumeName.toLowerCase().includes(searchQuery);
+            const matchSupplier = !selectedSupplierId || !colSupplierId || colSupplierId === selectedSupplierId;
+            const visible = matchSearch && matchSupplier;
+
+            col.style.display = visible ? 'block' : 'none';
+
+            // Auto-deselect hidden costumes
+            if (!visible && selectedCostumes.has(card.dataset.costumeId)) {
+                selectedCostumes.delete(card.dataset.costumeId);
+                card.classList.remove('selected');
+                card.querySelector('.check-icon').style.display = 'none';
+                card.querySelector('.import-price-input').style.display = 'none';
+                card.querySelector('.import-qty-input').style.display = 'none';
+                card.querySelector('.import-price').value = '';
+                card.querySelector('.import-qty').value = '1';
+            }
+        });
+
+
+        updateSummary();
+    });
+</script>
+</body>
+</html>

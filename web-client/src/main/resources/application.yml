@@ -1,0 +1,29 @@
+server:
+  port: 8090
+  error:
+    include-message: always
+    include-binding-errors: always
+
+spring:
+  application:
+    name: web-client
+  thymeleaf:
+    cache: false
+    encoding: UTF-8
+    mode: HTML
+
+services:
+  costume:
+    url: http://localhost:8082
+  supplier:
+    url: http://localhost:8083
+  importing-bill:
+    url: http://localhost:8084
+  bill-costume:
+    url: http://localhost:8085
+  user:
+    url: http://localhost:8081
+
+logging:
+  level:
+    com.costumestore: DEBUG

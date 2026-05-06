@@ -1,0 +1,8 @@
+rootProject.name = 'demo'
+
+include 'user-service'
+include 'costume-service'
+include 'supplier-service'
+include 'importing-bill-service'
+include 'bill-costume-service'
+include 'web-client'

@@ -1,8 +1,13 @@
 package com.costumestore.userservice.service.impl;
 
 import com.costumestore.userservice.dto.request.LoginRequest;
+import com.costumestore.userservice.dto.request.RegisterRequest;
 import com.costumestore.userservice.dto.response.LoginResponse;
+import com.costumestore.userservice.dto.response.RegisterResponse;
 import com.costumestore.userservice.dto.response.UserResponse;
+import com.costumestore.userservice.entity.Address;
+import com.costumestore.userservice.entity.Customer;
+import com.costumestore.userservice.entity.FullName;
 import com.costumestore.userservice.entity.Manager;
 import com.costumestore.userservice.entity.User;
 import com.costumestore.userservice.exception.ResourceNotFoundException;
@@ -82,6 +87,58 @@ public class UserServiceImpl implements UserService {
                 .fullName(fullName)
                 .managerCode(manager.getManagerCode())
                 .title(manager.getTitle())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public RegisterResponse register(RegisterRequest request) {
+        log.debug("Registering new customer: {}", request.getUsername());
+
+        if (userRepository.findByUsername(request.getUsername()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Tên đăng nhập đã tồn tại");
+        }
+
+        Address address = null;
+        if (request.getCity() != null || request.getStreet() != null) {
+            address = Address.builder()
+                    .city(request.getCity())
+                    .street(request.getStreet())
+                    .build();
+        }
+
+        FullName fullNameEntity = null;
+        if (request.getFirstName() != null || request.getLastName() != null) {
+            fullNameEntity = FullName.builder()
+                    .firstName(request.getFirstName())
+                    .lastName(request.getLastName())
+                    .build();
+        }
+
+        Customer customer = new Customer();
+        customer.setUsername(request.getUsername());
+        customer.setPassword(request.getPassword());
+        customer.setAddress(address);
+        customer.setFullName(fullNameEntity);
+        customer.setRewardPoint(0);
+        customer.setCustomerRanking("BRONZE");
+
+        Customer saved = userRepository.save(customer);
+
+        String fullName = null;
+        if (saved.getFullName() != null) {
+            String first = saved.getFullName().getFirstName();
+            String last = saved.getFullName().getLastName();
+            fullName = ((first == null ? "" : first) + " " + (last == null ? "" : last)).trim();
+            if (fullName.isBlank()) fullName = null;
+        }
+
+        log.info("Registered new customer id={} username={}", saved.getId(), saved.getUsername());
+        return RegisterResponse.builder()
+                .id(saved.getId())
+                .username(saved.getUsername())
+                .userType("CUSTOMER")
+                .fullName(fullName)
                 .build();
     }
 }

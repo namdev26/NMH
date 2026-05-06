@@ -1,13 +1,16 @@
 package com.costumestore.userservice.controller;
 
 import com.costumestore.userservice.dto.request.LoginRequest;
+import com.costumestore.userservice.dto.request.RegisterRequest;
 import com.costumestore.userservice.dto.request.UserListRequest;
 import com.costumestore.userservice.dto.response.LoginResponse;
+import com.costumestore.userservice.dto.response.RegisterResponse;
 import com.costumestore.userservice.dto.response.UserResponse;
 import com.costumestore.userservice.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,6 +31,14 @@ public class UserController {
         LoginResponse result = userService.login(request);
         log.info("<<< RESPONSE 200\n    Body: {}", result);
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/api/auth/register")
+    public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
+        log.info(">>> REQUEST POST /api/auth/register\n    Body: username={}", request.getUsername());
+        RegisterResponse result = userService.register(request);
+        log.info("<<< RESPONSE 201\n    Body: {}", result);
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
     @PostMapping("/api/users/by-ids")

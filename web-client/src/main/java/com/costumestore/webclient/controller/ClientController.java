@@ -4,6 +4,9 @@ import com.costumestore.webclient.dto.BillStatDto;
 import com.costumestore.webclient.dto.CostumeLineStatDto;
 import com.costumestore.webclient.dto.CostumeStatDto;
 import com.costumestore.webclient.dto.ImportResultDto;
+import com.costumestore.webclient.dto.LoginRequestDto;
+import com.costumestore.webclient.dto.LoginResponseDto;
+import com.costumestore.webclient.dto.RegisterRequestDto;
 import com.costumestore.webclient.model.Bill;
 import com.costumestore.webclient.model.Costume;
 import com.costumestore.webclient.model.CostumeDetail;
@@ -14,6 +17,7 @@ import com.costumestore.webclient.service.CostumeClientService;
 import com.costumestore.webclient.service.ImportHandleClientService;
 import com.costumestore.webclient.service.StatisticClientService;
 import com.costumestore.webclient.service.SupplierClientService;
+import com.costumestore.webclient.service.UserClientService;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +27,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -46,14 +51,148 @@ public class ClientController {
     public static final String SESSION_STAT_START = "statStartTime";
     public static final String SESSION_STAT_END = "statEndTime";
     public static final String SESSION_MANAGER_ID = "currentManagerId";
+    public static final String SESSION_CURRENT_USER = "currentUser";
 
     private final CostumeClientService costumeClientService;
     private final SupplierClientService supplierClientService;
     private final ImportHandleClientService importHandleClientService;
     private final StatisticClientService statisticClientService;
+    private final UserClientService userClientService;
+
+    // =========================================================
+    // Auth: Login / Logout / Register
+    // =========================================================
+
+    @GetMapping("/login")
+    public String loginPage(
+            @RequestParam(value = "error", required = false) String error,
+            @RequestParam(value = "registered", required = false) String registered,
+            @RequestParam(value = "tab", required = false) String tab,
+            HttpSession session,
+            Model model) {
+        if (session.getAttribute(SESSION_CURRENT_USER) != null) {
+            return "redirect:/home";
+        }
+        if (error != null) {
+            model.addAttribute("error", error);
+        }
+        if (registered != null) {
+            model.addAttribute("message", "Đăng ký thành công! Vui lòng đăng nhập.");
+        }
+        if ("register".equals(tab)) {
+            model.addAttribute("activeTab", "register");
+        } else {
+            model.addAttribute("activeTab", "login");
+        }
+        return "login";
+    }
+
+    @PostMapping("/login")
+    public String handleLogin(
+            @RequestParam("username") String username,
+            @RequestParam("password") String password,
+            HttpSession session,
+            Model model) {
+        try {
+            LoginRequestDto request = new LoginRequestDto();
+            request.setUsername(username);
+            request.setPassword(password);
+
+            LoginResponseDto response = userClientService.login(request);
+            session.setAttribute(SESSION_CURRENT_USER, response);
+            session.setAttribute(SESSION_MANAGER_ID, response.getId());
+            log.info("Login success: username={}, type={}", response.getUsername(), response.getUserType());
+            return "redirect:/home";
+
+        } catch (HttpClientErrorException e) {
+            String message = extractErrorMessage(e, "Sai tên đăng nhập hoặc mật khẩu");
+            log.warn("Login failed for username={}: {}", username, message);
+            model.addAttribute("error", message);
+            model.addAttribute("username", username);
+            model.addAttribute("activeTab", "login");
+            return "login";
+        } catch (Exception e) {
+            log.error("Login error: {}", e.getMessage());
+            model.addAttribute("error", "Không thể kết nối đến hệ thống. Vui lòng thử lại.");
+            model.addAttribute("username", username);
+            model.addAttribute("activeTab", "login");
+            return "login";
+        }
+    }
+
+    @PostMapping("/register")
+    public String handleRegister(
+            @RequestParam("username") String username,
+            @RequestParam("password") String password,
+            @RequestParam("confirmPassword") String confirmPassword,
+            @RequestParam(value = "firstName", required = false) String firstName,
+            @RequestParam(value = "lastName", required = false) String lastName,
+            @RequestParam(value = "city", required = false) String city,
+            @RequestParam(value = "street", required = false) String street,
+            Model model) {
+
+        if (!password.equals(confirmPassword)) {
+            model.addAttribute("registerError", "Mật khẩu xác nhận không khớp");
+            model.addAttribute("activeTab", "register");
+            model.addAttribute("regUsername", username);
+            model.addAttribute("regFirstName", firstName);
+            model.addAttribute("regLastName", lastName);
+            model.addAttribute("regCity", city);
+            model.addAttribute("regStreet", street);
+            return "login";
+        }
+
+        try {
+            RegisterRequestDto request = new RegisterRequestDto();
+            request.setUsername(username);
+            request.setPassword(password);
+            request.setFirstName(firstName);
+            request.setLastName(lastName);
+            request.setCity(city);
+            request.setStreet(street);
+
+            userClientService.register(request);
+            log.info("Register success: username={}", username);
+            return "redirect:/login?registered=true";
+
+        } catch (HttpClientErrorException e) {
+            String message = extractErrorMessage(e, "Đăng ký thất bại. Vui lòng thử lại.");
+            log.warn("Register failed for username={}: {}", username, message);
+            model.addAttribute("registerError", message);
+            model.addAttribute("activeTab", "register");
+            model.addAttribute("regUsername", username);
+            model.addAttribute("regFirstName", firstName);
+            model.addAttribute("regLastName", lastName);
+            model.addAttribute("regCity", city);
+            model.addAttribute("regStreet", street);
+            return "login";
+        } catch (Exception e) {
+            log.error("Register error: {}", e.getMessage());
+            model.addAttribute("registerError", "Không thể kết nối đến hệ thống. Vui lòng thử lại.");
+            model.addAttribute("activeTab", "register");
+            return "login";
+        }
+    }
+
+    @GetMapping("/logout")
+    public String logout(HttpSession session) {
+        session.invalidate();
+        return "redirect:/login";
+    }
+
+    // =========================================================
+    // Management pages (yêu cầu đăng nhập)
+    // =========================================================
 
     @GetMapping({"/", "/home"})
-    public String managerHome() {
+    public String managerHome(HttpSession session, Model model) {
+        LoginResponseDto currentUser = (LoginResponseDto) session.getAttribute(SESSION_CURRENT_USER);
+        if (currentUser == null) {
+            return "redirect:/login";
+        }
+        model.addAttribute("currentManagerName", currentUser.getFullName() != null
+                ? currentUser.getFullName() : currentUser.getUsername());
+        model.addAttribute("currentUser", currentUser);
         return "managerHome";
     }
 
@@ -65,6 +204,12 @@ public class ClientController {
             @RequestParam(value = "managerId", required = false) Long managerId,
             Model model,
             HttpSession session) {
+
+        LoginResponseDto currentUser = (LoginResponseDto) session.getAttribute(SESSION_CURRENT_USER);
+        if (currentUser == null) {
+            return "redirect:/login";
+        }
+
         log.info("getImportingCostumeForm: fetch costumes and suppliers");
         List<Costume> costumes = costumeClientService.getCostumeListToImport().stream()
                 .map(Costume::fromDto)
@@ -78,8 +223,7 @@ public class ClientController {
         if (managerId != null) {
             session.setAttribute(SESSION_MANAGER_ID, managerId);
         } else if (session.getAttribute(SESSION_MANAGER_ID) == null) {
-            // Fallback for demo mode when authentication is not integrated yet.
-            session.setAttribute(SESSION_MANAGER_ID, 4L);
+            session.setAttribute(SESSION_MANAGER_ID, currentUser.getId());
         }
 
         model.addAttribute("costumes", costumes);
@@ -101,6 +245,10 @@ public class ClientController {
             @RequestParam(value = "notes", required = false) List<String> notes,
             Model model,
             HttpSession session) {
+
+        if (session.getAttribute(SESSION_CURRENT_USER) == null) {
+            return "redirect:/login";
+        }
 
         Long managerId = (Long) session.getAttribute(SESSION_MANAGER_ID);
         if (managerId == null) {
@@ -188,6 +336,11 @@ public class ClientController {
             @RequestParam(value = "error", required = false) String error,
             Model model,
             HttpSession session) {
+
+        if (session.getAttribute(SESSION_CURRENT_USER) == null) {
+            return "redirect:/login";
+        }
+
         if ("time-range".equals(error)) {
             model.addAttribute("timeRangeError", "Thời gian bắt đầu phải nhỏ hơn hoặc bằng thời gian kết thúc.");
         }
@@ -207,6 +360,10 @@ public class ClientController {
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") LocalDateTime endTime,
             Model model,
             HttpSession session) {
+
+        if (session.getAttribute(SESSION_CURRENT_USER) == null) {
+            return "redirect:/login";
+        }
 
         if (startTime == null) {
             startTime = (LocalDateTime) session.getAttribute(SESSION_STAT_START);
@@ -242,6 +399,10 @@ public class ClientController {
             @RequestParam Long costumeLineId,
             Model model,
             HttpSession session) {
+
+        if (session.getAttribute(SESSION_CURRENT_USER) == null) {
+            return "redirect:/login";
+        }
 
         LocalDateTime startTime = (LocalDateTime) session.getAttribute(SESSION_STAT_START);
         LocalDateTime endTime = (LocalDateTime) session.getAttribute(SESSION_STAT_END);
@@ -282,6 +443,10 @@ public class ClientController {
             Model model,
             HttpSession session) {
 
+        if (session.getAttribute(SESSION_CURRENT_USER) == null) {
+            return "redirect:/login";
+        }
+
         LocalDateTime startTime = (LocalDateTime) session.getAttribute(SESSION_STAT_START);
         LocalDateTime endTime = (LocalDateTime) session.getAttribute(SESSION_STAT_END);
         if (startTime == null || endTime == null) {
@@ -312,5 +477,30 @@ public class ClientController {
         model.addAttribute("pageTitle", "Hoa don ban: " + costumeName);
         return "billResult";
     }
-}
 
+    // =========================================================
+    // Helper
+    // =========================================================
+
+    private String extractErrorMessage(HttpClientErrorException e, String defaultMsg) {
+        try {
+            String body = e.getResponseBodyAsString();
+            if (body.contains("\"message\"")) {
+                int start = body.indexOf("\"message\"") + 11;
+                int end = body.indexOf("\"", start);
+                if (end > start) {
+                    return body.substring(start, end);
+                }
+            }
+            if (body.contains("\"detail\"")) {
+                int start = body.indexOf("\"detail\"") + 10;
+                int end = body.indexOf("\"", start);
+                if (end > start) {
+                    return body.substring(start, end);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return defaultMsg;
+    }
+}
